@@ -33,11 +33,20 @@ class App {
         this.renderer.outputEncoding = THREE.sRGBEncoding;
         container.appendChild(this.renderer.domElement);
 
-        this.initScene();                 
+        this.initScene();
         this.setupXR();
-        
+
 
         window.addEventListener('resize', this.resize.bind(this));
+
+        var url = new URL(location);
+        var objURL = url.searchParams.get("objurl");
+        var txURL = url.searchParams.get("txurl");
+        var objName = url.searchParams.get("objname");
+        if (objURL && txURL && objName) {
+            this.loadObj3D(txURL, objURL, objName);
+        }
+
     }
 
     resize() {
@@ -47,64 +56,86 @@ class App {
     }
 
     loadObj3D(texturesURL, objURL, objName) {
-        if (texturesURL === null) {
-            texturesURL = objURL;
+        let scope = this;
+        scope.loadingBar.visible = true;
+
+        let onProgress = function (xhr) {
+            if (xhr.lengthComputable) {
+                var percentComplete = xhr.loaded / xhr.total * 100;
+                console.log(`${Math.round(percentComplete, 2)}'% downloaded`);
+            }
+        };
+
+        let onError = function (xhr) {
+            console.log(`An error happened! error : ${xhr}`);
+        };
+
+        if (texturesURL != "" && objURL != "" && objName != "") {
+
+            let mtlLoader = new MTLLoader();
+            mtlLoader.setResourcePath(texturesURL).setPath(objURL);
+            mtlLoader.load(objName + '.mtl', function (materials) {
+
+                materials.preload();
+
+                let objLoader = new OBJLoader();
+                objLoader.setMaterials(materials);
+                objLoader.setPath(objURL);
+                objLoader.load(objName + '.obj', function (object) {
+
+                    let scaleVal = 0.001;
+                    object.traverse(function (child) {
+                        if (child.material) {
+                            child.material.side = THREE.DoubleSide;
+                        }
+                        if (child.isMesh) {
+                            child.scale.x = child.scale.y = child.scale.z = scaleVal;
+                        }
+                    });
+
+                    object.rotation.x = (3 * Math.PI) / 2;
+
+                    scope.scene.add(object);
+                    scope.obj3D = object;
+                    scope.obj3D.visible = false;
+
+                    scope.loadingBar.visible = false;
+                    scope.initAR();
+
+                }, onProgress, onError);
+            });
+
+        } else {
+
+            var glftLoader = new THREE.GLTFLoader();
+            glftLoader.load(fileName,
+
+                function (gltf) {
+
+                    gltf.scene.traverse(function (object) {
+                        if (object.isMesh) {
+
+                            var item = new (BP3D.Items.Factory.getClass(itemType))(scope.model, metadata, object.geometry, new THREE.MeshFaceMaterial(object.material), position, rotation, scale);
+                            item.fixed = fixed || false;
+
+                            scope.items.push(item);
+                            scope.add(item);
+                            item.initObject();
+                            scope.itemLoadedCallbacks.fire(item);
+                        }
+                    });
+
+                }, onProgress, onError);
+
         }
-       
-        const self = this;
-       
-        self.loadingBar.visible = true;
 
-        let mtlLoader = new MTLLoader();
-        //mtlLoader.setResourcePath(metadata.texturesURL).setPath(metadata.objURL);       
-        mtlLoader.setResourcePath(texturesURL).setPath(objURL);
-        mtlLoader.load(objName + ".mtl", function (materials) {
 
-            materials.preload();
-
-            let objLoader = new OBJLoader();
-            objLoader.setMaterials(materials);
-            objLoader.setPath(objURL);
-            objLoader.load(objName + '.obj', function (obj) {
-
-                //let isStair = itemType == 10;
-                // let scaleVal = 0.001;
-                //object.scale.x = object.scale.y = object.scale.z = scaleVal;
-                let geometry, material;
-
-                obj.traverse(function (child) {
-                    if (child.material) {
-                        child.material.side = THREE.DoubleSide;
-                    }
-                    if (child.isMesh) {
-                        //child.scale.x = child.scale.y = child.scale.z = scaleVal;
-                    }
-                });
-
-                self.scene.add(obj);
-                self.obj3D = obj;
-                self.obj3D.visible = false;
-
-               self.loadingBar.visible = false;
-               self.initAR();
-                
-            }, // onProgress callback
-                function (xhr) {
-                    console.log((xhr.loaded / xhr.total * 100) + '% loaded');
-                    self.loadingBar.progress = (xhr.loaded / xhr.total);
-                },
-
-                // onError callback
-                function (error) {
-                    console.error('An error happened', error);
-                }
-            );
-        });
 
     }
 
+
     initScene() {
-        
+
         this.reticle = new THREE.Mesh(
             new THREE.RingBufferGeometry(0.15, 0.20, 32).rotateX(-Math.PI / 2),
             new THREE.MeshBasicMaterial({ color: 0xFF0000 })
@@ -131,7 +162,7 @@ class App {
                 if (self.reticle.visible) {
                     self.obj3D.position.setFromMatrixPosition(self.reticle.matrix);
                     self.obj3D.visible = true;
-                    console.log('!!! tap self.obj3D.position', self.obj3D.position);
+                    //console.log('!!! tap self.obj3D.position', self.obj3D.position);
                 }
             }
         });
@@ -151,12 +182,12 @@ class App {
                 pos.y = self.startPosition.y;
                 self.obj3D.position.copy(pos);
                 //self.ui.updateElement('info', `pan x:${ev.delta.x.toFixed(3)}, y:${ev.delta.y.toFixed(3)}, x:${ev.delta.z.toFixed(3)}`);
-                console.log("!! info " + `pan x:${ev.delta.x.toFixed(3)}, y:${ev.delta.y.toFixed(3)}, x:${ev.delta.z.toFixed(3)}`);
+                //console.log("!! info " + `pan x:${ev.delta.x.toFixed(3)}, y:${ev.delta.y.toFixed(3)}, x:${ev.delta.z.toFixed(3)}`);
             }
         });
         this.gestures.addEventListener('swipe', (ev) => {
             //console.log( ev );               
-            console.log("!!! swipe");
+            //console.log("!!! swipe");
             if (self.obj3D.visible) {
                 self.obj3D.visible = false;
                 //self.scene.remove( self.obj3D ); 
@@ -182,8 +213,8 @@ class App {
             } else {
                 self.obj3D.quaternion.copy(self.startQuaternion);
                 //self.obj3D.rotateY(ev.theta);
-                self.obj3D.rotateY(ev.theta * 10);               
-                console.log("!!! rotate");
+                self.obj3D.rotateY(ev.theta * 10);
+                //console.log("!!! rotate");
             }
         });
 
@@ -195,14 +226,14 @@ class App {
 
         const sessionInit = { requiredFeatures: ['hit-test'] };
 
-        function onSessionStarted(session) {           
+        function onSessionStarted(session) {
             session.addEventListener('end', onSessionEnded);
             self.renderer.xr.setReferenceSpaceType('local');
             self.renderer.xr.setSession(session);
             currentSession = session;
         }
 
-        function onSessionEnded() {            
+        function onSessionEnded() {
             currentSession.removeEventListener('end', onSessionEnded);
             currentSession = null;
             if (self.obj3D !== null) {
@@ -267,7 +298,7 @@ class App {
         }
 
         if (this.renderer.xr.isPresenting) {
-            this.gestures.update();            
+            this.gestures.update();
         }
 
         this.renderer.render(this.scene, this.camera);
