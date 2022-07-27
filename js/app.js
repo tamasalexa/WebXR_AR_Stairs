@@ -4,6 +4,7 @@ import { MTLLoader } from './three125/MTLLoader.js';
 import { OBJLoader } from './three125/OBJLoader.js';
 import { ControllerGestures } from './three125/ControllerGestures.js';
 
+
 class App {
     constructor() {
         const container = document.createElement('div');
@@ -161,6 +162,12 @@ class App {
             if (self.obj3D !== undefined) {
                 if (self.reticle.visible) {
                     self.obj3D.position.setFromMatrixPosition(self.reticle.matrix);
+                    //self.obj3D.position.setY(0);
+
+                    let pos = self.obj3D.position;
+                   console.log("self.obj3D.position", pos);                    
+                   document.getElementById("log").innerHTML = `position x: ${pos.x}  y: ${pos.y}  z: ${pos.z}`;
+
                     self.obj3D.visible = true;
                     //console.log('!!! tap self.obj3D.position', self.obj3D.position);
                 }
