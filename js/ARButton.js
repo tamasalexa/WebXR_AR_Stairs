@@ -13,16 +13,17 @@ class ARButton{
             this.onSessionStart = options.onSessionStart;
             this.onSessionEnd = options.onSessionEnd;
             this.sessionInit = options.sessionInit;
+            this.onClickFnCallback = options.onClickFnCallback;
         }
         
-        if ( 'xr' in navigator ) {
+        if ('xr' in navigator) {
 
 			const button = document.createElement( 'button' );
-			button.style.display = 'none';
-            button.style.height = '40px';
+            button.style.display = 'none';
+            
 
 			navigator.xr.isSessionSupported( 'immersive-ar' ).then( ( supported ) => {
-
+                button.style.display = '';
 				supported ? this.showStartAR( button ) : this.showARNotSupported( button );
 
 			} );
@@ -54,71 +55,51 @@ class ARButton{
             message.style.opacity = '1';
             
             document.body.appendChild ( message );
-
 		}
-
     }
 
 	showStartAR( button ) {
+        const self = this;
+
+        self.stylizeElement(button, true);       
 
         let currentSession = null;
-        const self = this;
         
-        this.stylizeElement( button, true, 30, true );
-        
-        function onSessionStarted( session ) {
-
+        function onSessionStarted(session) {
             session.addEventListener( 'end', onSessionEnded );
 
             self.renderer.xr.setReferenceSpaceType( 'local' );
             self.renderer.xr.setSession( session );
-            self.stylizeElement( button, false, 12, true );
+            self.stylizeElement( button, false );
             
-            button.textContent = 'STOP AR';
+            //button.textContent = 'STOP AR';
 
             currentSession = session;
             
-            if (self.onSessionStart !== undefined && self.onSessionStart !== null) self.onSessionStart();
-
+            if (self.onSessionStart !== undefined && self.onSessionStart !== null) self.onSessionStart();            
         }
 
         function onSessionEnded( ) {
 
             currentSession.removeEventListener( 'end', onSessionEnded );
 
-            self.stylizeElement( button, true, 12, true );
-            button.textContent = 'START AR';
+            self.stylizeElement( button, true);
+            //button.textContent = 'START AR';
 
             currentSession = null;
             
             if (self.onSessionEnd !== undefined && self.onSessionEnd !== null) self.onSessionEnd();
-
         }
 
-        //
+        //button.onmouseenter = function () {            
+        //    button.textContent = (currentSession===null) ? 'START AR' : 'STOP AR';
+        //    button.style.opacity = '1.0';
+        //};
 
-        button.style.display = '';
-        button.style.right = '20px';
-        button.style.width = '80px';
-        button.style.cursor = 'pointer';
-        button.innerHTML = '<i class="fas fa-camera"></i>';
-        
-
-        button.onmouseenter = function () {
-            
-            button.style.fontSize = '12px'; 
-            button.textContent = (currentSession===null) ? 'START AR' : 'STOP AR';
-            button.style.opacity = '1.0';
-
-        };
-
-        button.onmouseleave = function () {
-            
-            button.style.fontSize = '30px'; 
-            button.innerHTML = '<i class="fas fa-camera"></i>';
-            button.style.opacity = '0.5';
-
-        };
+        //button.onmouseleave = function () {                        
+        //    button.innerHTML = '<i class="fas fa-camera"></i>';
+        //    button.style.opacity = '0.5';
+        //};
 
         button.onclick = function () {
 
@@ -132,21 +113,18 @@ class ARButton{
                 // be requested separately.)
                 
                 navigator.xr.requestSession( 'immersive-ar', self.sessionInit ).then( onSessionStarted );
-
+                self.onClickFnCallback();
+                console.log("self.onClickFnCallback", self.onClickFnCallback);
             } else {
-
                 currentSession.end();
-
             }
-
         };
-
     }
 
     disableButton(button) {
 
-        button.style.cursor = 'auto';
-        button.style.opacity = '0.5';
+        //button.style.cursor = 'auto';
+        //button.style.opacity = '0.5';
         
         button.onmouseenter = null;
         button.onmouseleave = null;
@@ -155,32 +133,53 @@ class ARButton{
 
     }
 
-    showARNotSupported( button ) {
-        this.stylizeElement( button, false );
-        
+    showARNotSupported(button) {        
         this.disableButton(button);
 
-        button.style.display = '';
-        button.style.width = '100%';
-        button.style.right = '0px';
-        button.style.bottom = '0px';
-        button.style.border = '';
-        button.style.opacity = '1';
-        button.style.fontSize = '13px';
         button.textContent = 'AR NOT SUPPORTED';
 
+        button.style.position= 'absolute';
+        button.style.right= '0px';
+        button.style.top= '0px';
+        button.style.width = '100%';
+        button.style.height = '40px';
+        button.style.background = '#B41414';
+        button.style.color = '#FFFFFF';
+        button.style.fontSize ='20px';
+        button.style.textAlign = 'center';
+        button.style.opacity = '1';
     }
 
-    stylizeElement( element, active = true, fontSize = 13, ignorePadding = false ) {
-
+    //stylizeElement( element, active = true, fontSize = 13, ignorePadding = false ) {
+    stylizeElement(element, active = true) {
+        element.style = "";
+        element.style.display = '';        
         element.style.position = 'absolute';
-        element.style.bottom = '20px';
-        if (!ignorePadding) element.style.padding = '12px 6px';
+
+        if (active) {
+            element.innerHTML = '<i class="fas fa-camera  fa-5x"></i>';
+            element.style.width = '200px';
+            element.style.height = '200px';
+            element.style.left = '50%';
+            element.style.top = '50%';
+            element.style.marginLeft = '-100px';
+            element.style.top = '50%';
+            element.style.marginTop = '-100px';
+        } else {
+            element.innerHTML = '<i class="fas fa-camera  fa-2x"></i>';
+            element.style.right = '10px';
+            element.style.bottom = '10px';
+            element.style.width = '80px';
+            element.style.height = '80px';            
+        }
+
+        element.style.cursor = 'pointer';       
+        //if (!ignorePadding) element.style.padding = '12px 6px';
         element.style.border = '1px solid #fff';
-        element.style.borderRadius = '4px';
+        element.style.borderRadius = '15px';
         element.style.background = (active) ? 'rgba(20,150,80,1)' : 'rgba(180,20,20,1)';
         element.style.color = '#fff';
-        element.style.font = `normal ${fontSize}px sans-serif`;
+        element.style.fontSize = `20px`;
         element.style.textAlign = 'center';
         element.style.opacity = '0.5';
         element.style.outline = 'none';

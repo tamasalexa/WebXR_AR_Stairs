@@ -3,7 +3,32 @@ import { LoadingBar } from './LoadingBar.js';
 import { MTLLoader } from './three125/MTLLoader.js';
 import { OBJLoader } from './three125/OBJLoader.js';
 import { ControllerGestures } from './three125/ControllerGestures.js';
+import { ARButton } from './ARButton.js';
+import { CntrButtons } from './CntrButtons.js';
 
+let urlParams = new URL(location).searchParams;
+let offsetPos = new THREE.Vector3(0, 0, 0);
+const paramKeys = { objurl: "objurl", txurl: "txurl", objname: "objname", offsetX: "offsetX", offsetY: "offsetY", offsetZ: "offsetZ" };
+
+if (urlParams.has(paramKeys.offsetX)) {
+    let posX = parseFloat(urlParams.get(paramKeys.offsetX));    
+    if (!isNaN(posX)) {
+        offsetPos.setX(posX);
+    }
+}
+
+if (urlParams.has(paramKeys.offsetY)) {
+    let posY = parseFloat(urlParams.get(paramKeys.offsetY));
+    if (!isNaN(posY)) {
+        offsetPos.setY(posY);
+    }
+}
+if (urlParams.has(paramKeys.offsetZ)) {
+    let posZ = parseFloat(urlParams.get(paramKeys.offsetZ));
+    if (!isNaN(posZ)) {
+        offsetPos.setZ(posZ);
+    }
+}
 
 class App {
     constructor() {
@@ -20,14 +45,6 @@ class App {
 
         this.scene = new THREE.Scene();
 
-        const ambient = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 2);
-        ambient.position.set(0.5, 1, 0.25);
-        this.scene.add(ambient);
-
-        const light = new THREE.DirectionalLight();
-        light.position.set(0.2, 1, 1);
-        this.scene.add(light);
-
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         this.renderer.setPixelRatio(window.devicePixelRatio);
         this.renderer.setSize(window.innerWidth, window.innerHeight);
@@ -37,17 +54,9 @@ class App {
         this.initScene();
         this.setupXR();
 
-
         window.addEventListener('resize', this.resize.bind(this));
 
-        var url = new URL(location);
-        var objURL = url.searchParams.get("objurl");
-        var txURL = url.searchParams.get("txurl");
-        var objName = url.searchParams.get("objname");
-        if (objURL && txURL && objName) {
-            this.loadObj3D(txURL, objURL, objName);
-        }
-
+        this.cntrButtons = new CntrButtons();        
     }
 
     resize() {
@@ -57,6 +66,14 @@ class App {
     }
 
     loadObj3D(texturesURL, objURL, objName) {
+
+        if (urlParams.has(paramKeys.objurl) && urlParams.has(paramKeys.txurl) && urlParams.has(paramKeys.objname)) {
+            
+            objURL = urlParams.get(paramKeys.objurl);
+            texturesURL = urlParams.get(paramKeys.txurl);
+            objName = urlParams.get(paramKeys.objname);
+        }
+
         let scope = this;
         scope.loadingBar.visible = true;
 
@@ -94,48 +111,51 @@ class App {
                         }
                     });
 
-                    object.rotation.x = (3 * Math.PI) / 2;
+                    object.rotation.x = -Math.PI / 2;                    
 
-                    scope.scene.add(object);
-                    scope.obj3D = object;
+                    scope.obj3D = new THREE.Object3D();
+
+                    let box3 = new THREE.Box3().setFromObject(object);
+
+                    scope.obj3D.objectSize = new THREE.Vector3();
+                    box3.getSize(scope.obj3D.objectSize);
+
+                    scope.obj3D.objectCenter = new THREE.Vector3();
+                    box3.getCenter(scope.obj3D.objectCenter);                    
+
+                    scope.obj3D.objectStartPos = new THREE.Vector3().copy(scope.obj3D.objectCenter);
+                    scope.obj3D.objectStartPos.multiplyScalar(- 1);
+                    scope.obj3D.objectStartPos.setY(0);
+                    scope.obj3D.objectStartPos.add(offsetPos);
+
+                    object.position.copy(scope.obj3D.objectStartPos);
+
+                    scope.obj3D.add(object);
+
+                    scope.scene.add(scope.obj3D);
                     scope.obj3D.visible = false;
 
                     scope.loadingBar.visible = false;
-                    scope.initAR();
+                    //scope.initAR();
+
+                    scope.cntrButtons.obj3D = scope.obj3D;
 
                 }, onProgress, onError);
             });
 
-        } else {
-
-            var glftLoader = new THREE.GLTFLoader();
-            glftLoader.load(fileName,
-
-                function (gltf) {
-
-                    gltf.scene.traverse(function (object) {
-                        if (object.isMesh) {
-
-                            var item = new (BP3D.Items.Factory.getClass(itemType))(scope.model, metadata, object.geometry, new THREE.MeshFaceMaterial(object.material), position, rotation, scale);
-                            item.fixed = fixed || false;
-
-                            scope.items.push(item);
-                            scope.add(item);
-                            item.initObject();
-                            scope.itemLoadedCallbacks.fire(item);
-                        }
-                    });
-
-                }, onProgress, onError);
-
         }
-
-
-
     }
 
 
     initScene() {
+
+        const ambient = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 2);
+        ambient.position.set(0.5, 1, 0.25);
+        this.scene.add(ambient);
+
+        const light = new THREE.DirectionalLight();
+        light.position.set(0.2, 1, 1);
+        this.scene.add(light);
 
         this.reticle = new THREE.Mesh(
             new THREE.RingBufferGeometry(0.15, 0.20, 32).rotateX(-Math.PI / 2),
@@ -150,36 +170,52 @@ class App {
 
     setupXR() {
         this.renderer.xr.enabled = true;
-        //const btn = new ARButton(this.renderer, { sessionInit: { requiredFeatures: ['hit-test'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.body } } });
+        let options = {
+            sessionInit: {
+                requiredFeatures: ['hit-test'],
+                optionalFeatures: ['dom-overlay'],
+                domOverlay: { root: document.body },                
+            }
+        };
+        options.onSessionStart = function () {
+            if (this.scene !== null) {
+                this.initScene();
+            }
+        }.bind(this);
+        options.onSessionEnd = function () {
+            //if (this.obj3D !== null) {
+            if (this.scene !== null) {
+                this.scene.clear();
+                this.obj3D = null;
+                this.cntrButtons.hide();
+            }
+        }.bind(this);
+        options.onClickFnCallback = this.loadObj3D.bind(this);
+
+        const btn = new ARButton(this.renderer, options);
 
         const self = this;
-        this.hitTestSourceRequested = false;
-        this.hitTestSource = null;
+        self.hitTestSourceRequested = false;
+        self.hitTestSource = null;
 
-        this.gestures = new ControllerGestures(this.renderer);
-        this.gestures.addEventListener('tap', (ev) => {
+        self.gestures = new ControllerGestures(self.renderer);
+        self.gestures.addEventListener('tap', (ev) => {
             //console.log( '!!! tap' ); 
             if (self.obj3D !== undefined) {
                 if (self.reticle.visible) {
                     self.obj3D.position.setFromMatrixPosition(self.reticle.matrix);
-                    //self.obj3D.position.setY(0);
-
-                    let pos = self.obj3D.position;
-                   console.log("self.obj3D.position", pos);                    
-                   document.getElementById("log").innerHTML = `position x: ${pos.x}  y: ${pos.y}  z: ${pos.z}`;
-
                     self.obj3D.visible = true;
-                    //console.log('!!! tap self.obj3D.position', self.obj3D.position);
+                    this.cntrButtons.show();
                 }
             }
         });
-        this.gestures.addEventListener('doubletap', (ev) => {
+        self.gestures.addEventListener('doubletap', (ev) => {
             //console.log( 'doubletap');
         });
-        this.gestures.addEventListener('press', (ev) => {
+        self.gestures.addEventListener('press', (ev) => {
             //console.log( 'press' );            
         });
-        this.gestures.addEventListener('pan', (ev) => {
+        self.gestures.addEventListener('pan', (ev) => {
             //console.log( ev );
             if (ev.initialise !== undefined) {
                 self.startPosition = self.obj3D.position.clone();
@@ -192,15 +228,16 @@ class App {
                 //console.log("!! info " + `pan x:${ev.delta.x.toFixed(3)}, y:${ev.delta.y.toFixed(3)}, x:${ev.delta.z.toFixed(3)}`);
             }
         });
-        this.gestures.addEventListener('swipe', (ev) => {
+        self.gestures.addEventListener('swipe', (ev) => {
             //console.log( ev );               
             //console.log("!!! swipe");
             if (self.obj3D.visible) {
                 self.obj3D.visible = false;
+                this.cntrButtons.hide();
                 //self.scene.remove( self.obj3D ); 
             }
         });
-        this.gestures.addEventListener('pinch', (ev) => {
+        self.gestures.addEventListener('pinch', (ev) => {
             console.log("!!! pinch");
             /*
             //console.log( ev );  
@@ -208,54 +245,55 @@ class App {
                 self.startScale = self.obj3D.scale.clone();
             } else {
                 const scale = self.startScale.clone().multiplyScalar(ev.scale);
-                self.obj3D.scale.copy(scale);               
-               
-            }
+                self.obj3D.scale.copy(scale);
+                }
             */
         });
-        this.gestures.addEventListener('rotate', (ev) => {
+        self.gestures.addEventListener('rotate', (ev) => {
             //console.log( ev ); 
             if (ev.initialise !== undefined) {
                 self.startQuaternion = self.obj3D.quaternion.clone();
             } else {
                 self.obj3D.quaternion.copy(self.startQuaternion);
-                //self.obj3D.rotateY(ev.theta);
-                self.obj3D.rotateY(ev.theta * 10);
+                //self.obj3D.rotateY(ev.theta * 10);
+                self.obj3D.rotateY(ev.theta);
                 //console.log("!!! rotate");
             }
         });
 
+        
     }
 
-    initAR() {
-        let currentSession = null;
-        const self = this;
+    //initAR() {
+       
+    //    let currentSession = null;
+    //    const self = this;
 
-        const sessionInit = { requiredFeatures: ['hit-test'] };
+    //    const sessionInit = { requiredFeatures: ['hit-test'] };
 
-        function onSessionStarted(session) {
-            session.addEventListener('end', onSessionEnded);
-            self.renderer.xr.setReferenceSpaceType('local');
-            self.renderer.xr.setSession(session);
-            currentSession = session;
-        }
+    //    function onSessionStarted(session) {
+    //        session.addEventListener('end', onSessionEnded);
+    //        self.renderer.xr.setReferenceSpaceType('local');
+    //        self.renderer.xr.setSession(session);
+    //        currentSession = session;
+    //    }
 
-        function onSessionEnded() {
-            currentSession.removeEventListener('end', onSessionEnded);
-            currentSession = null;
-            if (self.obj3D !== null) {
-                self.scene.remove(self.obj3D);
-                self.obj3D = null;
-            }
-            self.renderer.setAnimationLoop(null);
-        }
+    //    function onSessionEnded() {
+    //        currentSession.removeEventListener('end', onSessionEnded);
+    //        currentSession = null;
+    //        if (self.obj3D !== null) {
+    //            self.scene.remove(self.obj3D);
+    //            self.obj3D = null;
+    //        }
+    //        self.renderer.setAnimationLoop(null);
+    //    }
 
-        if (currentSession === null) {
-            navigator.xr.requestSession('immersive-ar', sessionInit).then(onSessionStarted);
-        } else {
-            currentSession.end();
-        }
-    }
+    //    if (currentSession === null) {
+    //        navigator.xr.requestSession('immersive-ar', sessionInit).then(onSessionStarted);
+    //    } else {
+    //        currentSession.end();
+    //    }
+    //}
 
     requestHitTestSource() {
         const self = this;
