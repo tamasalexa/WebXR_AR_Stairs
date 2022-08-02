@@ -194,72 +194,71 @@ class App {
 
         const btn = new ARButton(this.renderer, options);
 
-        const self = this;
-        self.hitTestSourceRequested = false;
-        self.hitTestSource = null;
+        const scope = this;
+        scope.hitTestSourceRequested = false;
+        scope.hitTestSource = null;
 
-        self.gestures = new ControllerGestures(self.renderer);
-        self.gestures.addEventListener('tap', (ev) => {
+        scope.gestures = new ControllerGestures(scope.renderer);
+        scope.gestures.addEventListener('tap', function (ev) {
             //console.log( '!!! tap' ); 
-            if (self.obj3D !== undefined) {
-                if (self.reticle.visible) {
-                    self.obj3D.position.setFromMatrixPosition(self.reticle.matrix);
-                    self.obj3D.visible = true;
+            if (this.obj3D !== undefined) {
+                if (this.reticle.visible) {
+                    this.obj3D.position.setFromMatrixPosition(this.reticle.matrix);
+                    this.obj3D.visible = true;
                     this.cntrButtons.show();
                 }
             }
-        });
-        self.gestures.addEventListener('doubletap', (ev) => {
+        }.bind(scope));
+        scope.gestures.addEventListener('doubletap', (ev) => {
             //console.log( 'doubletap');
         });
-        self.gestures.addEventListener('press', (ev) => {
+        scope.gestures.addEventListener('press', (ev) => {
             //console.log( 'press' );            
         });
-        self.gestures.addEventListener('pan', (ev) => {
+        scope.gestures.addEventListener('pan', function (ev) {
             //console.log( ev );
             if (ev.initialise !== undefined) {
-                self.startPosition = self.obj3D.position.clone();
+                this.startPosition = this.obj3D.position.clone();
             } else {
-                //const pos = self.startPosition.clone().add( ev.delta.multiplyScalar(3) );
-                const pos = self.startPosition.clone().add(ev.delta.multiplyScalar(20));
-                pos.y = self.startPosition.y;
-                self.obj3D.position.copy(pos);
-                //self.ui.updateElement('info', `pan x:${ev.delta.x.toFixed(3)}, y:${ev.delta.y.toFixed(3)}, x:${ev.delta.z.toFixed(3)}`);
+                //const pos = scope.startPosition.clone().add( ev.delta.multiplyScalar(3) );
+                const pos = this.startPosition.clone().add(ev.delta.multiplyScalar(30));
+                pos.y = this.startPosition.y;
+                this.obj3D.position.copy(pos);
+                //this.ui.updateElement('info', `pan x:${ev.delta.x.toFixed(3)}, y:${ev.delta.y.toFixed(3)}, x:${ev.delta.z.toFixed(3)}`);
                 //console.log("!! info " + `pan x:${ev.delta.x.toFixed(3)}, y:${ev.delta.y.toFixed(3)}, x:${ev.delta.z.toFixed(3)}`);
             }
-        });
-        self.gestures.addEventListener('swipe', (ev) => {
+        }.bind(scope));
+        scope.gestures.addEventListener('swipe', function (ev){
             //console.log( ev );               
             //console.log("!!! swipe");
-            if (self.obj3D.visible) {
-                self.obj3D.visible = false;
+            if (this.obj3D.visible) {
+                this.obj3D.visible = false;
                 this.cntrButtons.hide();
-                //self.scene.remove( self.obj3D ); 
+                //scope.scene.remove( scope.obj3D ); 
             }
-        });
-        self.gestures.addEventListener('pinch', (ev) => {
+        }.bind(scope));
+        scope.gestures.addEventListener('pinch', (ev) => {
             console.log("!!! pinch");
             /*
             //console.log( ev );  
             if (ev.initialise !== undefined) {
-                self.startScale = self.obj3D.scale.clone();
+                scope.startScale = scope.obj3D.scale.clone();
             } else {
-                const scale = self.startScale.clone().multiplyScalar(ev.scale);
-                self.obj3D.scale.copy(scale);
+                const scale = scope.startScale.clone().multiplyScalar(ev.scale);
+                scope.obj3D.scale.copy(scale);
                 }
             */
         });
-        self.gestures.addEventListener('rotate', (ev) => {
+        scope.gestures.addEventListener('rotate', function (ev) {
             //console.log( ev ); 
             if (ev.initialise !== undefined) {
-                self.startQuaternion = self.obj3D.quaternion.clone();
+                this.startQuaternion = this.obj3D.quaternion.clone();
             } else {
-                self.obj3D.quaternion.copy(self.startQuaternion);
-                //self.obj3D.rotateY(ev.theta * 10);
-                self.obj3D.rotateY(ev.theta);
+                this.obj3D.quaternion.copy(this.startQuaternion);
+                this.obj3D.rotateY(ev.theta * 10);
                 //console.log("!!! rotate");
             }
-        });
+        }.bind(scope));
 
         
     }
@@ -267,25 +266,25 @@ class App {
     //initAR() {
        
     //    let currentSession = null;
-    //    const self = this;
+    //    const scope = this;
 
     //    const sessionInit = { requiredFeatures: ['hit-test'] };
 
     //    function onSessionStarted(session) {
     //        session.addEventListener('end', onSessionEnded);
-    //        self.renderer.xr.setReferenceSpaceType('local');
-    //        self.renderer.xr.setSession(session);
+    //        scope.renderer.xr.setReferenceSpaceType('local');
+    //        scope.renderer.xr.setSession(session);
     //        currentSession = session;
     //    }
 
     //    function onSessionEnded() {
     //        currentSession.removeEventListener('end', onSessionEnded);
     //        currentSession = null;
-    //        if (self.obj3D !== null) {
-    //            self.scene.remove(self.obj3D);
-    //            self.obj3D = null;
+    //        if (scope.obj3D !== null) {
+    //            scope.scene.remove(scope.obj3D);
+    //            scope.obj3D = null;
     //        }
-    //        self.renderer.setAnimationLoop(null);
+    //        scope.renderer.setAnimationLoop(null);
     //    }
 
     //    if (currentSession === null) {
@@ -296,23 +295,23 @@ class App {
     //}
 
     requestHitTestSource() {
-        const self = this;
+        const scope = this;
 
         const session = this.renderer.xr.getSession();
         session.requestReferenceSpace('viewer').then(
             function (referenceSpace) {
                 session.requestHitTestSource({ space: referenceSpace }).then(
                     function (source) {
-                        self.hitTestSource = source;
+                        scope.hitTestSource = source;
                     }
                 )
             }
         );
 
         session.addEventListener('end', function () {
-            self.hitTestSourceRequested = false;
-            self.hitTestSource = null;
-            self.referenceSpace = null;
+            scope.hitTestSourceRequested = false;
+            scope.hitTestSource = null;
+            scope.referenceSpace = null;
         });
 
         this.hitTestSourceRequested = true;
@@ -335,7 +334,7 @@ class App {
     render(timestamp, frame) {
         const dt = this.clock.getDelta();
 
-        const self = this;
+        const scope = this;
 
         if (frame) {
             if (this.hitTestSourceRequested === false) this.requestHitTestSource();
